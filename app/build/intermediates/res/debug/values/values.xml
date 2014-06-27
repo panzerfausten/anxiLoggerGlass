@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- From: file:/Users/panzer/AndroidstudioProjects/AnxiLogger/app/src/main/res/values/strings.xml -->
+    <eat-comment />
+
+    <string name="app_name">AnxiLogger</string>
+    <string name="glass_voice_trigger">Track my anxiety</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="title_activity_anxi_logger">AnxiLogger</string>
+    <!-- From: file:/Users/panzer/AndroidstudioProjects/AnxiLogger/app/src/main/res/values/styles.xml -->
+    <eat-comment />
+
+    <style name="AppTheme" parent="android:Theme.Holo.Light"></style>
+
+</resources>
