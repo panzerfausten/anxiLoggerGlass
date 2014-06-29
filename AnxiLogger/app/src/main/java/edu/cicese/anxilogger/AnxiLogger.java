@@ -18,6 +18,19 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * An {@link Activity} showing a tuggable "Hello World!" card.
  * <p>
@@ -110,6 +123,7 @@ public class AnxiLogger extends Activity {
                         Message msg = new Message();
                         msg.obj = ir_value;
                         eyeHandler.sendMessage(msg);
+                        postDataToServer("http://192.168.43.47:5000/api/loggerdata", "12121212", ir_value);
                     }
             }
         } );
@@ -119,10 +133,10 @@ public class AnxiLogger extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
-        Intent bindIndent = new Intent(AnxiLogger.this,
+        /*Intent bindIndent = new Intent(AnxiLogger.this,
                 LoggerService.class);
         mContext.stopService(bindIndent);
-        isRunning = false;
+        isRunning = false;*/
     }
 
     @Override
@@ -138,11 +152,11 @@ public class AnxiLogger extends Activity {
 
     @Override
     protected void onPause() {
-        mCardScroller.deactivate();
+        //mCardScroller.deactivate();
         super.onPause();
-        Intent bindIndent = new Intent(AnxiLogger.this,
-                LoggerService.class);
-        mContext.stopService(bindIndent);
+        //Intent bindIndent = new Intent(AnxiLogger.this,
+        //        LoggerService.class);
+        //mContext.stopService(bindIndent);
     }
     Card card;
     /**
@@ -153,6 +167,29 @@ public class AnxiLogger extends Activity {
 
         card.setText(R.string.hello_world);
         return card.getView();
+    }
+
+    private void postDataToServer(String uri, String timestamp, String value){
+        HttpClient client = new DefaultHttpClient();
+        HttpPost post = new HttpPost(uri);
+        HttpResponse response;
+        try{
+            List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
+            nameValuePairs.add(new BasicNameValuePair("timestamp", timestamp));
+            nameValuePairs.add(new BasicNameValuePair("value", value));
+            post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+            response = client.execute(post);
+            Log.i("AnxiLogger", response.toString());
+        } catch (ClientProtocolException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IllegalStateException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
 }
