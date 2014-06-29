@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import edu.cicese.anxilogger.api.AnxiApi;
+
 /**
  * An {@link Activity} showing a tuggable "Hello World!" card.
  * <p>
@@ -118,12 +120,14 @@ public class AnxiLogger extends Activity {
             @Override
             public void run() {
                 String ir_value;
+                AnxiApi api = new AnxiApi();
                     while(isRunning) {
                         ir_value = String.valueOf(irlogger.getIRSensorData());
                         Message msg = new Message();
                         msg.obj = ir_value;
                         eyeHandler.sendMessage(msg);
-                        postDataToServer("http://192.168.43.47:5000/api/loggerdata", "12121212", ir_value);
+
+                        api.postDataToServer(ir_value);
                     }
             }
         } );
@@ -169,27 +173,6 @@ public class AnxiLogger extends Activity {
         return card.getView();
     }
 
-    private void postDataToServer(String uri, String timestamp, String value){
-        HttpClient client = new DefaultHttpClient();
-        HttpPost post = new HttpPost(uri);
-        HttpResponse response;
-        try{
-            List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
-            nameValuePairs.add(new BasicNameValuePair("timestamp", timestamp));
-            nameValuePairs.add(new BasicNameValuePair("value", value));
-            post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
-            response = client.execute(post);
-            Log.i("AnxiLogger", response.toString());
-        } catch (ClientProtocolException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IllegalStateException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
+
 
 }
