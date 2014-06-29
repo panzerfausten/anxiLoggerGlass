@@ -14,6 +14,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -128,6 +132,11 @@ public class AnxiLogger extends Activity {
                         eyeHandler.sendMessage(msg);
 
                         api.postDataToServer(ir_value);
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
             }
         } );
@@ -135,13 +144,42 @@ public class AnxiLogger extends Activity {
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
-        /*Intent bindIndent = new Intent(AnxiLogger.this,
-                LoggerService.class);
-        mContext.stopService(bindIndent);
-        isRunning = false;*/
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+            openOptionsMenu();
+            return true;
+        }
+        return false;
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.layout.stop_menu, menu);
+        return true;
+
+
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle item selection. Menu items typically start another
+        // activity, start a service, or broadcast another intent.
+        switch (item.getItemId()) {
+            case R.id.reply_menu_item:
+                Intent bindIndent = new Intent(AnxiLogger.this,
+                LoggerService.class);
+            mContext.stopService(bindIndent);
+            isRunning = false;
+                finish();
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+
+    }
+
+
 
     @Override
     protected void onResume() {

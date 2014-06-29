@@ -13,7 +13,9 @@
         <activity
             android:name=".AnxiLogger"
             android:icon="@drawable/ic_glass_logo"
-            android:label="@string/title_activity_anxi_logger" >
+            android:label="@string/title_activity_anxi_logger"
+            android:immersive="true"
+            >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

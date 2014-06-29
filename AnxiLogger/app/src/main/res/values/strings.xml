@@ -5,4 +5,6 @@
     <string name="title_activity_anxi_logger">AnxiLogger</string>
     <string name="hello_world">Hello world!</string>
     <string name="glass_voice_trigger">Track my anxiety</string>
+    <string name="stop">Stop</string>
+
 </resources>
