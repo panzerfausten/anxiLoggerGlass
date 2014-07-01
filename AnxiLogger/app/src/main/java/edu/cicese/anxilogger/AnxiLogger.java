@@ -111,7 +111,9 @@ public class AnxiLogger extends Activity {
 
         }
     };
+    private ArrayList<Float> window = new ArrayList<Float>();
     private void getIRData(){
+
         Intent bindIndent = new Intent(AnxiLogger.this,
                 LoggerService.class);
 
@@ -123,15 +125,17 @@ public class AnxiLogger extends Activity {
 
             @Override
             public void run() {
-                String ir_value;
+                Float ir_value;
                 AnxiApi api = new AnxiApi();
                     while(isRunning) {
-                        ir_value = String.valueOf(irlogger.getIRSensorData());
+                        ir_value = irlogger.getIRSensorData();
+
                         Message msg = new Message();
                         msg.obj = ir_value;
                         eyeHandler.sendMessage(msg);
-
-                        api.postDataToServer(ir_value);
+                        window.add(ir_value);
+                        monitorBlinking();
+                        //api.postDataToServer(ir_value.toString());
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException e) {
@@ -143,6 +147,39 @@ public class AnxiLogger extends Activity {
         t.start();
     }
 
+    private void monitorBlinking(){
+
+                    if (window.size() == 9) {
+                        if (isBlink(window) ){
+                            Log.i("AnxiLogger","Blink");
+                            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                            am.playSoundEffect(Sounds.TAP);
+                            //remove elements
+                            window.removeAll(window);
+                        }else {
+                            //remove elements
+                            window.remove(0);
+                            window.remove(0);
+                            window.remove(0);
+                            window.remove(0);
+                        }
+                    }
+
+    }
+    private boolean isBlink(List<Float> IRdata){
+            int _threshold = 3;
+            float _avg = ( IRdata.get(0) + IRdata.get(1) + IRdata.get(2) + IRdata.get(6) + IRdata.get(7) + IRdata.get(8) )  / 6;
+            float _distance = IRdata.get(4) - _avg;
+            if( _distance < _threshold){
+                return false;
+            }else{
+                Log.i("ANXILOGGER_IRDATA",IRdata.get(4).toString());
+                Log.i("ANXILOGGER_DISTANCE", String.valueOf( (_distance)));
+                return true;
+
+            }
+
+    }
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
