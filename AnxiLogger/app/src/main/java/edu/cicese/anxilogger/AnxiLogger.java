@@ -76,7 +76,7 @@ public class AnxiLogger extends Activity implements SensorEventListener {
         super.onCreate(bundle);
         isRunning =false;
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        accSensor = (Sensor) sensorManager.getSensorList(
+        accSensor = sensorManager.getSensorList(
                 Sensor.TYPE_ACCELEROMETER).get(0);
         mContext  = getApplicationContext();
                 mView = buildView();
@@ -128,6 +128,18 @@ public class AnxiLogger extends Activity implements SensorEventListener {
 
         }
     };
+
+    Handler motionHandler = new Handler(){
+        public void handleMessage(Message msg) {
+
+            Card newcard = new Card(mContext);
+
+            newcard.setText(msg.obj.toString());
+            setContentView(newcard.getView());
+
+        }
+    };
+
     private ArrayList<Float> window = new ArrayList<Float>();
     private ArrayList<Float> irValues = new ArrayList<Float>();
     private ArrayList<Float> xAccValues = new ArrayList<Float>();
@@ -153,7 +165,10 @@ public class AnxiLogger extends Activity implements SensorEventListener {
                     ir_value = irlogger.getIRSensorData();
 
                     Message msg = new Message();
-                    msg.obj = ir_value;
+                    msg.obj = ir_value + "\n"
+                        + xAccValue + "\n"
+                        + yAccValue + "\n"
+                        + zAccValue + "\n";
                     eyeHandler.sendMessage(msg);
                     if(isBlinkingWithAcc(ir_value)){
                         Log.i("AnxiLoggerGlass", "Blinking detected");
@@ -253,6 +268,9 @@ public class AnxiLogger extends Activity implements SensorEventListener {
             // "variance:"+(xAccVar+yAccVar+zAccVar/3.0));
             if ((xAccVar + yAccVar + zAccVar) / 3.0 > motionThreshold) {
                 return false;
+            }
+            else{
+
             }
 
             Float left = (irValues.get(0) + irValues.get(1) + irValues
@@ -359,6 +377,8 @@ public class AnxiLogger extends Activity implements SensorEventListener {
         Intent bindIndent = new Intent(AnxiLogger.this,
                 LoggerService.class);
         mContext.startService(bindIndent);
+        sensorManager.registerListener(this, accSensor,
+                SensorManager.SENSOR_DELAY_FASTEST);
         getIRData();
     }
 
