@@ -8,7 +8,12 @@ import com.google.android.glass.widget.CardScrollView;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.media.AudioManager;
+import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -46,7 +51,7 @@ import edu.cicese.anxilogger.api.AnxiApi;
  * and use a {@link com.google.android.glass.touchpad.GestureDetector}.
  * @see <a href="https://developers.google.com/glass/develop/gdk/touch">GDK Developer Guide</a>
  */
-public class AnxiLogger extends Activity {
+public class AnxiLogger extends Activity implements SensorEventListener {
 
     /** {@link CardScrollView} to use as the main content view. */
     private CardScrollView mCardScroller;
@@ -56,11 +61,23 @@ public class AnxiLogger extends Activity {
 
     private Context mContext;
     private boolean isRunning;
+    IRSensorLogger irSensorLogger;
+    private SensorManager sensorManager;
+    private Sensor accSensor;
+    private float irValue;
+    private float xAccValue;
+    private float yAccValue;
+    private float zAccValue;
+    private SoundPool mSoundPool;
+    private int mSoundID;
 
     @Override
     protected void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         isRunning =false;
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        accSensor = (Sensor) sensorManager.getSensorList(
+                Sensor.TYPE_ACCELEROMETER).get(0);
         mContext  = getApplicationContext();
                 mView = buildView();
 
@@ -112,6 +129,11 @@ public class AnxiLogger extends Activity {
         }
     };
     private ArrayList<Float> window = new ArrayList<Float>();
+    private ArrayList<Float> irValues = new ArrayList<Float>();
+    private ArrayList<Float> xAccValues = new ArrayList<Float>();
+    private ArrayList<Float> yAccValues = new ArrayList<Float>();
+    private ArrayList<Float> zAccValues = new ArrayList<Float>();
+    private Long lastBlinkTimestamp = System.currentTimeMillis();
     private void getIRData(){
 
         Intent bindIndent = new Intent(AnxiLogger.this,
@@ -122,26 +144,29 @@ public class AnxiLogger extends Activity {
         Thread t = new Thread(new Runnable() {
             IRSensorLogger irlogger = new IRSensorLogger();
 
-
             @Override
             public void run() {
                 Float ir_value;
                 AnxiApi api = new AnxiApi();
-                    while(isRunning) {
-                        ir_value = irlogger.getIRSensorData();
+                Long lastBlinkTimestamp = System.currentTimeMillis();
+                while(isRunning) {
+                    ir_value = irlogger.getIRSensorData();
 
-                        Message msg = new Message();
-                        msg.obj = ir_value;
-                        eyeHandler.sendMessage(msg);
-                        window.add(ir_value);
-                        monitorBlinking();
-                        //api.postDataToServer(ir_value.toString());
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                    Message msg = new Message();
+                    msg.obj = ir_value;
+                    eyeHandler.sendMessage(msg);
+                    if(isBlinkingWithAcc(ir_value)){
+                        Log.i("AnxiLoggerGlass", "Blinking detected");
+                        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                        am.playSoundEffect(Sounds.TAP);
                     }
+                    //api.postDataToServer(ir_value.toString());
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         } );
         t.start();
@@ -149,36 +174,145 @@ public class AnxiLogger extends Activity {
 
     private void monitorBlinking(){
 
-                    if (window.size() == 9) {
-                        if (isBlink(window) ){
-                            Log.i("AnxiLogger","Blink");
-                            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-                            am.playSoundEffect(Sounds.TAP);
-                            //remove elements
-                            window.removeAll(window);
-                        }else {
-                            //remove elements
-                            window.remove(0);
-                            window.remove(0);
-                            window.remove(0);
-                            window.remove(0);
-                        }
-                    }
+        if (window.size() == 9) {
+            if (isBlink(window) ){
+                Log.i("AnxiLogger","Blink");
+                AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                am.playSoundEffect(Sounds.TAP);
+                //remove elements
+                window.removeAll(window);
+            }else {
+                //remove elements
+                window.remove(0);
+                window.remove(0);
+                window.remove(0);
+                window.remove(0);
+            }
+        }
+    }
+
+    private void monitorBlinkingWithAcc(){
 
     }
-    private boolean isBlink(List<Float> IRdata){
-            int _threshold = 3;
-            float _avg = ( IRdata.get(0) + IRdata.get(1) + IRdata.get(2) + IRdata.get(6) + IRdata.get(7) + IRdata.get(8) )  / 6;
-            float _distance = IRdata.get(4) - _avg;
-            if( _distance < _threshold){
-                return false;
-            }else{
-                Log.i("ANXILOGGER_IRDATA",IRdata.get(4).toString());
-                Log.i("ANXILOGGER_DISTANCE", String.valueOf( (_distance)));
-                return true;
 
+    private boolean isBlinkingWithAcc(Float logData){
+        float irTHRESHOLD = 6.0f;
+        // DOCUMENT error code:
+        // -1.0: permission denied.
+        // -2.0: thread has just stopped.
+        if (logData > 0.0f) {
+            irValue = logData;
+
+            // peak detection
+            irValues.add(irValue);
+            xAccValues.add(xAccValue);
+            yAccValues.add(yAccValue);
+            zAccValues.add(zAccValue);
+            if (irValues.size() < 8) {
+                return false;
+            }
+            irValues.remove(0);
+            xAccValues.remove(0);
+            yAccValues.remove(0);
+            zAccValues.remove(0);
+
+            // skip peak detection while being in motion
+            // TODO: refactoring! bad hack.
+            float motionThreshold = 0.5f;
+            float xAccAve = 0;
+            float yAccAve = 0;
+            float zAccAve = 0;
+            for (int i = 0; i < irValues.size(); i++) {
+                xAccAve += xAccValues.get(i);
+                yAccAve += yAccValues.get(i);
+                zAccAve += zAccValues.get(i);
+            }
+            xAccAve = xAccAve / (float) xAccValues.size();
+            yAccAve = yAccAve / (float) yAccValues.size();
+            zAccAve = zAccAve / (float) zAccValues.size();
+
+            float xAccVar = 0;
+            float yAccVar = 0;
+            float zAccVar = 0;
+            for (int i = 0; i < irValues.size(); i++) {
+                xAccVar += Math.pow(Math.pow(
+                                (xAccValues.get(i) - xAccAve), 2.0),
+                        1.0 / 2.0);
+                yAccVar += Math.pow(Math.pow(
+                                (yAccValues.get(i) - yAccAve), 2.0),
+                        1.0 / 2.0);
+                zAccVar += Math.pow(Math.pow(
+                                (zAccValues.get(i) - zAccAve), 2.0),
+                        1.0 / 2.0);
+            }
+            xAccVar = xAccVar / (float) xAccValues.size();
+            yAccVar = yAccVar / (float) yAccValues.size();
+            zAccVar = zAccVar / (float) zAccValues.size();
+
+            // Log.v("variance",
+            // "variance:"+(xAccVar+yAccVar+zAccVar/3.0));
+            if ((xAccVar + yAccVar + zAccVar) / 3.0 > motionThreshold) {
+                return false;
             }
 
+            Float left = (irValues.get(0) + irValues.get(1) + irValues
+                    .get(2)) / 3.0f;
+            Float right = (irValues.get(4) + irValues.get(5) + irValues
+                    .get(6)) / 3.0f;
+            Float peak = irValues.get(3);
+
+            if (left < peak && peak < right) {
+                return false;
+            }
+            if (left > peak && peak > right) {
+                return false;
+            }
+
+            Float peak_to_left = (float) Math.pow((peak - left)
+                    * (peak - left), 0.5);
+            Float peak_to_right = (float) Math.pow(
+                    (peak - right) * (peak - right), 0.5);
+            Float left_to_right = (float) Math.pow(
+                    (right - left) * (right - left), 0.5);
+
+            if (peak_to_left < left_to_right
+                    || peak_to_right < left_to_right) {
+                return false;
+            }
+
+            Float diff = (float) Math.pow(
+                    Math.pow(peak - (left + right) / 2.0f, 2),
+                    0.5);
+            if (diff > irTHRESHOLD) {
+                Long blinkTimestamp = System
+                        .currentTimeMillis();
+                if (blinkTimestamp > lastBlinkTimestamp + 300) {
+                    lastBlinkTimestamp = blinkTimestamp;
+                    return true;
+                }
+            }
+            else{
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private boolean isBlink(List<Float> IRdata){
+        int _threshold = 7;
+
+//        float _avg = ( IRdata.get(0) + IRdata.get(1) + IRdata.get(2) + IRdata.get(6) + IRdata.get(7) + IRdata.get(8) )  / 6;
+//        float _distance = IRdata.get(4) - _avg;
+//        if( _distance < _threshold){
+//            return false;
+//        }else{
+//
+//            Log.i("ANXILOGGER_IRDATA",IRdata.get(4).toString());
+//            Log.i("ANXILOGGER_DISTANCE", String.valueOf( (_distance)));
+//            return true;
+//
+//        }
+        return false;
     }
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -224,7 +358,6 @@ public class AnxiLogger extends Activity {
         mCardScroller.activate();
         Intent bindIndent = new Intent(AnxiLogger.this,
                 LoggerService.class);
-
         mContext.startService(bindIndent);
         getIRData();
     }
@@ -249,5 +382,17 @@ public class AnxiLogger extends Activity {
     }
 
 
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+    }
 
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        switch (event.sensor.getType()) {
+            case Sensor.TYPE_ACCELEROMETER:
+                xAccValue = event.values[0];
+                yAccValue = event.values[1];
+                zAccValue = event.values[2];
+        }
+    }
 }
